@@ -43,13 +43,13 @@
         const firebaseConfig = typeof __firebase_config !== 'undefined' 
             ? JSON.parse(__firebase_config) 
             : {
-                apiKey: "AIzaSyBIFQvRQV532R0UUmBG3GgDVmG2mtcIr0E",
-  authDomain: "javis-pasteleria.firebaseapp.com",
-  projectId: "javis-pasteleria",
-  storageBucket: "javis-pasteleria.firebasestorage.app",
-  messagingSenderId: "609103655029",
-  appId: "1:609103655029:web:2b6f576c5360d81148c83c"
-            };
+               apiKey: "AIzaSyDh3w6i1HRUTuWWI9P1BMeWni5JxIDQ0N8",
+  authDomain: "javis-pasteleria-160626.firebaseapp.com",
+  projectId: "javis-pasteleria-160626",
+  storageBucket: "javis-pasteleria-160626.firebasestorage.app",
+  messagingSenderId: "662827193071",
+  appId: "1:662827193071:web:56021a2bf97f75fac6011a"
+};
 
         // REEMPLAZA ESTO SI QUIERES USAR LA INTELIGENCIA ARTIFICIAL EN GASTOS
         const GEMINI_API_KEY = "TU_API_KEY_DE_GEMINI_AQUI"; 
@@ -107,7 +107,7 @@
         function App() {
             const [user, setUser] = useState(null);
             const [activeTab, setActiveTab] = useState('produccion');
-            const isOfflineMode = firebaseConfig.apiKey === "AIzaSyBIFQvRQV532R0UUmBG3GgDVmG2mtcIr0E";
+            const isOfflineMode = firebaseConfig.apiKey === "AIzaSyDh3w6i1HRUTuWWI9P1BMeWni5JxIDQ0N8";
             
             // Estados de la base de datos
             const [inventory, setInventory] = useState({});
