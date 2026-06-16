@@ -38,20 +38,17 @@
         // ==========================================
         // 1. CONFIGURACIÓN DE FIREBASE Y API
         // ==========================================
-        // Se detecta automáticamente el entorno de prueba. 
-        // Cuando subas a GitHub, reemplaza las credenciales por las tuyas.
         const firebaseConfig = typeof __firebase_config !== 'undefined' 
             ? JSON.parse(__firebase_config) 
             : {
-               apiKey: "AIzaSyDh3w6i1HRUTuWWI9P1BMeWni5JxIDQ0N8",
+                apiKey: "AIzaSyDh3w6i1HRUTuWWI9P1BMeWni5JxIDQ0N8",
   authDomain: "javis-pasteleria-160626.firebaseapp.com",
   projectId: "javis-pasteleria-160626",
   storageBucket: "javis-pasteleria-160626.firebasestorage.app",
   messagingSenderId: "662827193071",
   appId: "1:662827193071:web:56021a2bf97f75fac6011a"
-};
+            };
 
-        // REEMPLAZA ESTO SI QUIERES USAR LA INTELIGENCIA ARTIFICIAL EN GASTOS
         const GEMINI_API_KEY = "TU_API_KEY_DE_GEMINI_AQUI"; 
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'javis-pasteleria-app';
 
@@ -62,7 +59,7 @@
         const db = firebase.firestore();
         const auth = firebase.auth();
         
-        // Helper para la ruta correcta de la base de datos
+        // Helper para usar la ruta estricta requerida por los permisos
         const getBaseRef = () => db.collection('artifacts').doc(appId).collection('public').doc('data');
 
         // ==========================================
@@ -107,7 +104,6 @@
         function App() {
             const [user, setUser] = useState(null);
             const [activeTab, setActiveTab] = useState('produccion');
-            const isOfflineMode = firebaseConfig.apiKey === "AIzaSyDh3w6i1HRUTuWWI9P1BMeWni5JxIDQ0N8";
             
             // Estados de la base de datos
             const [inventory, setInventory] = useState({});
@@ -121,10 +117,8 @@
                 setTimeout(() => setNotification(null), 3000);
             };
 
-            // Autenticación de Firebase (Requerido para permisos de lectura/escritura)
+            // Autenticación de Firebase
             useEffect(() => {
-                if (isOfflineMode) return;
-                
                 const initAuth = async () => {
                     try {
                         if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
@@ -140,15 +134,11 @@
                 
                 const unsub = auth.onAuthStateChanged(u => setUser(u));
                 return () => unsub();
-            }, [isOfflineMode]);
+            }, []);
 
             // Escuchar la base de datos en tiempo real
             useEffect(() => {
-                if (isOfflineMode) {
-                    console.warn("¡OJO! No has puesto tu configuración de Firebase. La app no guardará los datos en la nube.");
-                    return;
-                }
-                if (!user) return; // Esperar a estar autenticado
+                if (!user) return; // Requiere estar autenticado primero
 
                 const unsubInv = getBaseRef().collection('inventory').onSnapshot(snap => {
                     const inv = {};
@@ -156,26 +146,30 @@
                     setInventory(inv);
                 }, err => console.error("Error cargando inventario:", err));
 
-                const unsubProd = getBaseRef().collection('productions').orderBy('timestamp', 'desc').onSnapshot(snap => {
+                const unsubProd = getBaseRef().collection('productions').onSnapshot(snap => {
                     const prods = [];
                     snap.forEach(doc => prods.push({ id: doc.id, ...doc.data() }));
+                    // Ordenamiento en memoria para evitar errores de Firebase Index
+                    prods.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
                     setProductions(prods);
                 }, err => console.error("Error cargando producción:", err));
 
-                const unsubSales = getBaseRef().collection('sales').orderBy('timestamp', 'desc').onSnapshot(snap => {
+                const unsubSales = getBaseRef().collection('sales').onSnapshot(snap => {
                     const s = [];
                     snap.forEach(doc => s.push({ id: doc.id, ...doc.data() }));
+                    s.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
                     setSales(s);
                 }, err => console.error("Error cargando ventas:", err));
 
-                const unsubExp = getBaseRef().collection('expenses').orderBy('timestamp', 'desc').onSnapshot(snap => {
+                const unsubExp = getBaseRef().collection('expenses').onSnapshot(snap => {
                     const exp = [];
                     snap.forEach(doc => exp.push({ id: doc.id, ...doc.data() }));
+                    exp.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
                     setExpenses(exp);
                 }, err => console.error("Error cargando gastos:", err));
 
                 return () => { unsubInv(); unsubProd(); unsubSales(); unsubExp(); };
-            }, [user, isOfflineMode]);
+            }, [user]);
 
             // === MÓDULO 1: PRODUCCIÓN ===
             const ProduccionModule = () => {
@@ -184,7 +178,7 @@
 
                 const handleSubmit = async (e) => {
                     e.preventDefault();
-                    if (isOfflineMode) return showNotification('Modo offline: Configura tu Firebase para guardar', 'error');
+                    if (!user) return showNotification('Iniciando sesión...', 'error');
                     setLoading(true);
                     try {
                         const slug = sanitizeId(formData.product);
@@ -204,14 +198,14 @@
                         showNotification('Producción registrada con éxito 🍰');
                         setFormData({ ...formData, product: '', qty: '', price: '' });
                     } catch (error) {
-                        showNotification('Error al registrar (Revisa configuración de Firebase)', 'error');
+                        showNotification('Error al registrar', 'error');
                         console.error(error);
                     }
                     setLoading(false);
                 };
 
                 const handleDeleteStock = async (slug) => {
-                    if (isOfflineMode) return showNotification('Modo offline: Configura tu Firebase', 'error');
+                    if (!user) return;
                     try {
                         await getBaseRef().collection('inventory').doc(slug).delete();
                         showNotification('Producto eliminado del stock', 'success');
@@ -219,7 +213,7 @@
                 };
 
                 const handleDeleteProduction = async (prod) => {
-                    if (isOfflineMode) return showNotification('Modo offline: Configura tu Firebase', 'error');
+                    if (!user) return;
                     try {
                         const slug = prod.productSlug || sanitizeId(prod.product);
                         const currentInv = inventory[slug];
@@ -304,7 +298,7 @@
 
             // === MÓDULO 2: VENTA ===
             const VentaModule = () => {
-                const [formData, setFormData] = useState({ date: getTodayStr(), productSlug: '', qty: 1, client: '', payment: 'Efectivo', phone: '' });
+                const [formData, setFormData] = useState({ date: getTodayStr(), productSlug: '', qty: 1, client: '', payment: 'Efectivo', phone: '', mixEfectivo: '', mixTransferencia: '', mixDeuda: '' });
                 const [loading, setLoading] = useState(false);
                 const availableProducts = Object.entries(inventory).filter(([_, item]) => item.stock > 0);
                 const selectedProduct = formData.productSlug ? inventory[formData.productSlug] : null;
@@ -312,17 +306,46 @@
 
                 const handleSubmit = async (e) => {
                     e.preventDefault();
-                    if (isOfflineMode) return showNotification('Modo offline: Configura tu Firebase', 'error');
+                    if (!user) return showNotification('Iniciando sesión...', 'error');
                     if (!selectedProduct) return;
                     if (formData.qty > selectedProduct.stock) { showNotification('No hay suficiente stock', 'error'); return; }
+
+                    let mixDetails = null;
+                    let isDeuda = formData.payment === 'Deuda';
+                    let deudaAmount = 0;
+
+                    // Lógica para pagos divididos
+                    if (formData.payment === 'Mixto') {
+                        const efe = Number(formData.mixEfectivo) || 0;
+                        const trans = Number(formData.mixTransferencia) || 0;
+                        const deu = Number(formData.mixDeuda) || 0;
+                        if (efe + trans + deu !== total) {
+                            showNotification(`La suma de pagos ($${efe + trans + deu}) no coincide con el total ($${total})`, 'error');
+                            return;
+                        }
+                        mixDetails = { efectivo: efe, transferencia: trans, deuda: deu };
+                        if (deu > 0) {
+                            isDeuda = true;
+                            deudaAmount = deu;
+                        }
+                    } else if (formData.payment === 'Deuda') {
+                        deudaAmount = total;
+                    }
+
+                    if (isDeuda && !formData.phone) {
+                        showNotification('El teléfono es obligatorio para registrar la deuda', 'error');
+                        return;
+                    }
 
                     setLoading(true);
                     try {
                         await getBaseRef().collection('sales').add({
                             date: formData.date, productName: selectedProduct.name, productSlug: formData.productSlug,
                             qty: Number(formData.qty), price: selectedProduct.price, total: total,
-                            client: formData.client, paymentMethod: formData.payment, phone: formData.payment === 'Deuda' ? formData.phone : '',
-                            status: formData.payment === 'Deuda' ? 'Pendiente' : 'Pagado', timestamp: new Date().toISOString()
+                            client: formData.client, paymentMethod: formData.payment, mixDetails: mixDetails,
+                            phone: isDeuda ? formData.phone : '',
+                            status: isDeuda ? 'Pendiente' : 'Pagado', deudaAmount: deudaAmount,
+                            timestamp: new Date().toISOString()
                         });
                         
                         await getBaseRef().collection('inventory').doc(formData.productSlug).update({ 
@@ -330,13 +353,13 @@
                         });
 
                         showNotification('Venta registrada 🛍️');
-                        setFormData({ date: getTodayStr(), productSlug: '', qty: 1, client: '', payment: 'Efectivo', phone: '' });
-                    } catch (error) { showNotification('Error al vender', 'error'); }
+                        setFormData({ date: getTodayStr(), productSlug: '', qty: 1, client: '', payment: 'Efectivo', phone: '', mixEfectivo: '', mixTransferencia: '', mixDeuda: '' });
+                    } catch (error) { showNotification('Error al vender', 'error'); console.error(error); }
                     setLoading(false);
                 };
 
                 const handleDeleteSale = async (sale) => {
-                    if (isOfflineMode) return showNotification('Modo offline: Configura tu Firebase', 'error');
+                    if (!user) return;
                     try {
                         const currentInv = inventory[sale.productSlug];
                         if(currentInv) {
@@ -383,16 +406,35 @@
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-stone-600 mb-1">Método de Pago</label>
-                                    <div className="grid grid-cols-3 gap-2">
-                                        {['Efectivo', 'Transferencia', 'Deuda'].map(method => (
+                                    <div className="grid grid-cols-4 gap-2">
+                                        {['Efectivo', 'Transferencia', 'Deuda', 'Mixto'].map(method => (
                                             <button type="button" key={method} onClick={() => setFormData({...formData, payment: method})}
-                                                className={`p-2 rounded-xl text-sm font-bold transition-all ${formData.payment === method ? 'bg-emerald-400 text-white shadow-md' : 'bg-emerald-50 text-emerald-600'}`}>
+                                                className={`p-2 rounded-xl text-[11px] sm:text-xs font-bold transition-all ${formData.payment === method ? 'bg-emerald-400 text-white shadow-md' : 'bg-emerald-50 text-emerald-600'}`}>
                                                 {method}
                                             </button>
                                         ))}
                                     </div>
                                 </div>
-                                {formData.payment === 'Deuda' && (
+
+                                {formData.payment === 'Mixto' && (
+                                    <div className="p-4 bg-emerald-50 rounded-2xl space-y-3 border border-emerald-100">
+                                        <div className="text-sm font-bold text-emerald-700 mb-2">Desglose (Total Venta: ${total})</div>
+                                        <div className="flex items-center gap-2">
+                                            <label className="w-20 text-xs font-medium text-stone-600">Efectivo $</label>
+                                            <input type="number" min="0" value={formData.mixEfectivo} onChange={e => setFormData({...formData, mixEfectivo: e.target.value})} className="flex-1 p-2 rounded-xl border-none focus:ring-2 focus:ring-emerald-300 text-stone-700 text-sm" />
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <label className="w-20 text-xs font-medium text-stone-600">Transf. $</label>
+                                            <input type="number" min="0" value={formData.mixTransferencia} onChange={e => setFormData({...formData, mixTransferencia: e.target.value})} className="flex-1 p-2 rounded-xl border-none focus:ring-2 focus:ring-emerald-300 text-stone-700 text-sm" />
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <label className="w-20 text-xs font-medium text-stone-600">Deuda $</label>
+                                            <input type="number" min="0" value={formData.mixDeuda} onChange={e => setFormData({...formData, mixDeuda: e.target.value})} className="flex-1 p-2 rounded-xl border-none focus:ring-2 focus:ring-emerald-300 text-stone-700 text-sm" />
+                                        </div>
+                                    </div>
+                                )}
+
+                                {(formData.payment === 'Deuda' || (formData.payment === 'Mixto' && Number(formData.mixDeuda) > 0)) && (
                                     <div>
                                         <label className="block text-sm font-medium text-stone-600 mb-1">Teléfono (para cobranza)</label>
                                         <input type="tel" required placeholder="+569..." value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} className="w-full p-3 rounded-xl bg-rose-50 border-none focus:ring-2 focus:ring-rose-300 text-stone-700" />
@@ -429,11 +471,11 @@
 
             // === MÓDULO 3: COBRANZA ===
             const CobranzaModule = () => {
-                const pendingSales = sales.filter(s => s.paymentMethod === 'Deuda' && s.status === 'Pendiente');
+                const pendingSales = sales.filter(s => s.status === 'Pendiente');
                 const calculateDays = (dateStr) => Math.floor((new Date() - new Date(dateStr)) / (1000 * 60 * 60 * 24));
 
                 const handleMarkPaid = async (id) => {
-                    if (isOfflineMode) return showNotification('Modo offline: Configura tu Firebase', 'error');
+                    if (!user) return;
                     try {
                         await getBaseRef().collection('sales').doc(id).update({ status: 'Pagado' });
                         showNotification('Deuda marcada como pagada 🎉');
@@ -442,8 +484,19 @@
 
                 const sendWhatsApp = (sale) => {
                     const days = calculateDays(sale.date);
-                    const msg = `¡Hola ${sale.client}! 👋 Te escribimos de Javis Pasteleria 🍰. Te recordamos amablemente que tienes un saldo pendiente de $${sale.total.toLocaleString()} por la compra de ${sale.productName} el día ${sale.date} (${days} días). ¡Cualquier duda nos avisas! Que tengas un lindo día ✨.`;
+                    const amountOwed = sale.deudaAmount || sale.total;
+                    const msg = `¡Hola ${sale.client}! 👋 Te escribimos de Javis Pasteleria 🍰. Te recordamos amablemente que tienes un saldo pendiente de $${amountOwed.toLocaleString()} por la compra de ${sale.productName} el día ${sale.date} (${days} días). ¡Cualquier duda nos avisas! Que tengas un lindo día ✨.`;
                     window.open(`https://wa.me/${sale.phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(msg)}`, '_blank');
+                };
+
+                const sendToAll = () => {
+                    if(pendingSales.length === 0) return showNotification('No hay deudas pendientes', 'success');
+                    showNotification("Abriendo WhatsApps... Asegúrate de permitir ventanas emergentes en tu navegador.", "success");
+                    pendingSales.forEach((sale, index) => {
+                        setTimeout(() => {
+                            sendWhatsApp(sale);
+                        }, index * 1000); // 1 sec delay between opens
+                    });
                 };
 
                 return (
@@ -454,12 +507,18 @@
                                     <i className="fa-solid fa-wallet text-amber-400"></i> Por Cobrar
                                 </h2>
                                 <div className="text-2xl font-black text-amber-500 mt-1">
-                                    ${pendingSales.reduce((sum, s) => sum + s.total, 0).toLocaleString()}
+                                    ${pendingSales.reduce((sum, s) => sum + (s.deudaAmount || s.total), 0).toLocaleString()}
                                 </div>
                             </div>
+                            <button onClick={sendToAll} className="bg-amber-100 text-amber-600 p-3 rounded-2xl font-bold flex flex-col items-center shadow-sm">
+                                <i className="fa-solid fa-messages"></i>
+                                <span className="text-[10px]">Recordar Todos</span>
+                            </button>
                         </div>
                         <div className="space-y-4">
-                            {pendingSales.map(sale => (
+                            {pendingSales.map(sale => {
+                                const amountOwed = sale.deudaAmount || sale.total;
+                                return (
                                 <div key={sale.id} className="bg-white p-5 rounded-3xl shadow-sm border border-stone-100 relative overflow-hidden">
                                     <div className="absolute top-0 right-0 bg-rose-100 text-rose-500 px-3 py-1 text-xs font-bold rounded-bl-xl">
                                         {calculateDays(sale.date)} días mora
@@ -467,7 +526,8 @@
                                     <div className="mb-3">
                                         <h3 className="font-bold text-lg text-stone-700">{sale.client}</h3>
                                         <div className="text-sm text-stone-500">{sale.qty}x {sale.productName}</div>
-                                        <div className="font-black text-amber-500 mt-1">${sale.total.toLocaleString()}</div>
+                                        <div className="font-black text-amber-500 mt-1">${amountOwed.toLocaleString()}</div>
+                                        {sale.paymentMethod === 'Mixto' && <div className="text-xs text-stone-400 mt-1">(Pago Parcial - Total Venta: ${sale.total.toLocaleString()})</div>}
                                     </div>
                                     <div className="flex gap-2">
                                         <a href={`tel:${sale.phone}`} className="flex-1 bg-stone-100 text-stone-600 py-2 rounded-xl flex justify-center items-center gap-2 font-bold hover:bg-stone-200">
@@ -481,7 +541,7 @@
                                         </button>
                                     </div>
                                 </div>
-                            ))}
+                            )})}
                             {pendingSales.length === 0 && (
                                 <div className="text-center p-10 text-stone-400 flex flex-col items-center">
                                     <i className="fa-solid fa-circle-check text-4xl text-stone-200 mb-2"></i>
@@ -517,7 +577,7 @@
 
                 const handleSubmit = async (e) => {
                     e.preventDefault();
-                    if (isOfflineMode) return showNotification('Modo offline: Configura tu Firebase', 'error');
+                    if (!user) return showNotification('Iniciando sesión...', 'error');
                     setLoading(true);
                     try {
                         await getBaseRef().collection('expenses').add({
@@ -667,7 +727,7 @@
 
                     {notification && (
                         <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 animate-bounce">
-                            <div className={`px-6 py-3 rounded-full shadow-lg font-bold text-white flex items-center gap-2 ${notification.type === 'error' ? 'bg-rose-500' : 'bg-stone-800'}`}>
+                            <div className={`px-6 py-3 rounded-full shadow-lg font-bold text-white flex items-center gap-2 ${notification.type === 'error' ? 'bg-rose-500' : (notification.type === 'info' ? 'bg-blue-500' : 'bg-stone-800')}`}>
                                 <i className={`fa-solid ${notification.type === 'error' ? 'fa-circle-exclamation' : 'fa-circle-check'}`}></i>
                                 {notification.msg}
                             </div>
