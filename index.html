@@ -43,12 +43,12 @@
         const firebaseConfig = typeof __firebase_config !== 'undefined' 
             ? JSON.parse(__firebase_config) 
             : {
-                apiKey: "TU_API_KEY_DE_FIREBASE",
-                authDomain: "tu-proyecto.firebaseapp.com",
-                projectId: "tu-proyecto",
-                storageBucket: "tu-proyecto.appspot.com",
-                messagingSenderId: "123456789",
-                appId: "1:123456789:web:abcdef"
+                apiKey: "AIzaSyBIFQvRQV532R0UUmBG3GgDVmG2mtcIr0E",
+                authDomain: "javis-pasteleria.firebaseapp.com",
+                projectId: "javis-pasteleria",
+                storageBucket: "javis-pasteleria.firebasestorage.app",
+                messagingSenderId: "609103655029",
+                appId: "1:609103655029:web:2b6f576c5360d81148c83c"
             };
 
         // REEMPLAZA ESTO SI QUIERES USAR LA INTELIGENCIA ARTIFICIAL EN GASTOS
@@ -107,7 +107,7 @@
         function App() {
             const [user, setUser] = useState(null);
             const [activeTab, setActiveTab] = useState('produccion');
-            const isOfflineMode = firebaseConfig.apiKey === "TU_API_KEY_DE_FIREBASE";
+            const isOfflineMode = firebaseConfig.apiKey === "AIzaSyBIFQvRQV532R0UUmBG3GgDVmG2mtcIr0E";
             
             // Estados de la base de datos
             const [inventory, setInventory] = useState({});
